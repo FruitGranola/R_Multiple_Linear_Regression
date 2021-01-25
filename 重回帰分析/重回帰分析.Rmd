@@ -383,7 +383,7 @@ CI %>%
                   color = "blue",
                   size = 1) +
   geom_hline(yintercept = 0, 
-             linetype = 3, 
+             linetype = 2, 
              color = "red") +
   geom_text(aes(x = term,
                 y = estimate,
