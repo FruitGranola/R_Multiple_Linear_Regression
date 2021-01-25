@@ -1082,7 +1082,7 @@ data %&lt;&gt;%
 <h1>5. 重回帰分析</h1>
 <div id="重回帰分析の実行" class="section level2">
 <h2>5-1. 重回帰分析の実行</h2>
-<pre><code>得票率 = 選挙費用 + 当選回数 - 候補者数 + 政党規模ダミー</code></pre>
+<pre><code>得票率 = 選挙費用 + 当選回数 + 候補者数 + 政党規模ダミー</code></pre>
 <p>これが重回帰式だ。Rで重回帰式を書くと、以下のようになる。</p>
 <pre class="r"><code>model &lt;- lm(voteshare ~ exppv + previous + nocand + party_size, data = data)</code></pre>
 <p>また、独立変数の有意性をしっかり確認するために統制変数を1個づつ足していく。 そして、以下のように結果の表を記述する。</p>
