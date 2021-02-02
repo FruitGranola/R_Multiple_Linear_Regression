@@ -29,7 +29,7 @@ knitr::opts_chunk$set(warning = F,
                       fig.align = "center")
 ```
 
-この記事のコードをまとめたものは[Github](https://github.com/FruitGranola?tab=repositories)にあります。
+この記事のコードをまとめたものは[Github](https://github.com/FruitGranola/R_Multiple_linear_Regression)にあります。
 
 # 使用するパッケージ
 
@@ -200,9 +200,14 @@ data %>%
 ```{r}
 data %>% 
   ggplot(aes(x = voteshare)) +
-  geom_histogram(aes(y = ..density..), color = "black", fill = "gray") +
-  labs(x = "得票率", y = "密度") +
-  facet_wrap(~ party_size)
+  geom_histogram(aes(y = ..density..),
+                 color = "black",
+                 fill = "gray") +
+  labs(x = "得票率", 
+       y = "密度") +
+  facet_wrap(~ party_size, 
+             labeller = as_labeller(c(`0` = "共産党",
+                                      `1` = "自民党・民主党")))
 ```
 
 ## 4-2. 従属変数と独立変数の散布図を確認
@@ -217,10 +222,12 @@ data %>%
              color = factor(party_size))) +
   geom_point() +
   geom_smooth(method = lm) +
+  scale_color_discrete(name = "政党規模", 
+                       breaks = c("0", "1"), 
+                       labels = c("共産党", "自民党・民主党")) +
   labs(x = "有権者一人当たりの選挙費用",
        y = "得票率",
-       title = "選挙費用と得票率の散布図",
-       color = "政党規模") 
+       title = "選挙費用と得票率の散布図") 
 ```
 
 正の相関が見られる。
@@ -233,10 +240,12 @@ data %>%
              color = factor(party_size))) +
   geom_point() +
   geom_smooth(method = lm) +
+  scale_color_discrete(name = "政党規模", 
+                       breaks = c("0", "1"), 
+                       labels = c("共産党", "自民党・民主党")) +
   labs(x = "当選回数",
        y = "得票率",
-       title = "当選回数と得票率の散布図",
-       color = "政党規模") 
+       title = "当選回数と得票率の散布図") 
 ```
 
 負の相関が見られる。
@@ -249,10 +258,12 @@ data %>%
              color = factor(party_size))) +
   geom_point() +
   geom_smooth(method = lm) +
+  scale_color_discrete(name = "政党規模", 
+                       breaks = c("0", "1"), 
+                       labels = c("共産党", "自民党・民主党")) +
   labs(x = "候補者数",
        y = "得票率",
-       title = "候補者数と得票率の散布図",
-       color = "政党規模") 
+       title = "候補者数と得票率の散布図") 
 ```
 
 政党規模が大きいほうが、得票率が高いようだ。
@@ -264,10 +275,12 @@ data %>%
              y = voteshare,
              fill = factor(party_size))) +
   geom_boxplot() +
+  scale_fill_discrete(name = "政党規模", 
+                      breaks = c("0", "1"), 
+                      labels = c("共産党", "自民党・民主党")) +
   labs(x = "政党規模ダミー",
        y = "得票率",
-       title = "政党規模で層化した得票率の箱ひげ図",
-       fill = "政党規模") 
+       title = "政党規模で層化した得票率の箱ひげ図") 
 ```
 
 # 5. 重回帰分析  
@@ -303,14 +316,9 @@ lm3 <- lm(voteshare ~ exppv + previous + nocand, data = data)
 stargazer(lm1, lm2, lm3, model,
           type = "html",
           style = "ajps",
-          report = "vc*s", # 表示する係数
           digits = 2, 
           align = T, # 中央揃え
-          ci = F, # TRUEで信頼区間を表示する
-          ci.level = 0.95, # 信頼区間の幅
-          ci.separator = " / ", # 95%信頼区間を数値として表示する。
           keep.stat = c("n", "adj.rsq", "f"), # 下の方で表示する統計量
-          dep.var.caption = 'Outcome variable',
           dep.var.labels = "得票率",
           covariate.labels = c("選挙費用", "当選回数", 
                                "候補者数", "政党規模"))
@@ -406,6 +414,48 @@ CI %>%
   coord_flip() 
 ```
 
+## 得票率の予測値
+
+独立変数である選挙費用を最小値から最大値まで動かし、どのような得票率が得られるかを可視化した。
+統制変数を平均値で固定している。
+
+これをみると、政党規模が大きいと切片が高く、選挙費用を高くする意味がありそうだ。
+逆に、政党規模が小さいと選挙費用と得票率の間に正の関係にあろうが得票率は低いため、選挙費用を高くする意味が薄い。
+
+```{r}
+pred <- function(x){
+  model %>% 
+  predict(newdata = data.frame(
+    exppv = min(data$exppv):max(data$exppv),
+    previous = mean(data$previous),
+    nocand = mean(data$nocand),
+    party_size = x),
+    se.fit = T,
+    formula = model) %>% 
+    as.data.frame() %>% 
+    mutate("upper" = fit + qnorm(0.975) * se.fit,
+           "lower" = fit + qnorm(0.025) * se.fit,
+           exppv = min(data$exppv):max(data$exppv),
+           party_size = x)
+}
+
+data_pred <- lapply(X = 0:1, FUN = pred) %>% bind_rows()
+```
+
+```{r}
+data_pred %>% 
+ggplot(aes(x = exppv,
+           y = fit, 
+           group = party_size)) +
+  geom_line() +
+  geom_ribbon(aes(ymin = lower, 
+                  ymax = upper,
+                  fill = factor(party_size)),
+              alpha = .5,
+              show.legend = F) +
+  labs(x = "選挙費用", y = "得票率の予測値")
+```
+
 # 6. 分析結果の解釈  
 
 分析が終わったとしても、気を抜いてはいけない。
@@ -417,24 +467,14 @@ CI %>%
 その結果、有権者一人当たりの選挙費用が得票率と統計的に有意な関係にあるとわかった。しかし、統制変数よりもbeta値が小さく、影響は小さいと考えざるを得ない。
 また、キャタピラープロットを図示した結果、区間推定は非常に短く、点推定は相当程度正確であると言えるが、推定値の0のラインに触れているように見え、有権者一人当たりの選挙費用を10円増やしても得票率が1%ptしか上昇しないことから、実質的な有意性は無いと判断しても良い。
 ちなみに、有権者一人当たりの選挙費用を10円増やすというのは、有権者数*10円ということであり、有権者が10万人ならば選挙費用を100万円増やすごとに得票率が1%ptしか上昇しないということである。
+ただ、、統制変数を平均値に固定し、選挙費用を観測値の最小値から最大値まで動かして得票率の予測値を可視化すると、
+その結果、政党規模によって切片が異なり、所属する政党の規模によって選挙費用を高くする意味があるかないかが変化することがわかった。
+政党規模が大きいと切片が高く、選挙費用を高くすることで当選が視野に入るぐらい得票率が高くなるようだ。
+逆に、政党規模が小さいと切片が低く、選挙費用を高くしても当選が難しいとわかる。
+そのため、より厳密にいえば、政党規模が大きいと選挙費用は実質的に有意であると言える。
 
 
 以上のようになる。
 論文であればもう少し論文の目的を振り返っても良いだろう。
 
 enjoy !
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
